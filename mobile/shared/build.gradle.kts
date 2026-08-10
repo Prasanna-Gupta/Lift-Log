@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    kotlin("plugin.serialization") version "2.1.0" // add this
 }
 
 kotlin {
@@ -38,11 +39,13 @@ kotlin {
            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
        }
     }
-    
+
+    val supabaseVersion = "3.1.0"
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
+            implementation("io.ktor:ktor-client-okhttp:3.0.3")
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -53,6 +56,11 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(compose.materialIconsExtended)
+            api("io.github.jan-tennert.supabase:auth-kt:${supabaseVersion}")
+            api("io.github.jan-tennert.supabase:postgrest-kt:${supabaseVersion}")
+            api("io.github.jan-tennert.supabase:compose-auth:${supabaseVersion}")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
