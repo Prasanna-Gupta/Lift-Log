@@ -1,0 +1,2 @@
+Starting a Gradle Daemon, 1 busy Daemon could not be reused, use --status for details
+Daemon JVM discovery is an incubating feature.
