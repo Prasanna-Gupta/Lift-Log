@@ -44,21 +44,24 @@ fun AppShell() {
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (currentTab) {
-                Tab.HOME -> Text("Home feed — coming soon")
+                Tab.HOME -> HomeFeedScreen()
                 Tab.LOG -> {
+                    var isNested by remember { mutableStateOf(false) }
                     Column {
-                        SegmentedButtonRow(
-                            options = listOf("Workout" to LogSection.WORKOUT, "Diet" to LogSection.DIET),
-                            selected = logSection,
-                            onSelect = { logSection = it }
-                        )
+                        if (!isNested) {
+                            SegmentedButtonRow(
+                                options = listOf("Workout" to LogSection.WORKOUT, "Diet" to LogSection.DIET),
+                                selected = logSection,
+                                onSelect = { logSection = it }
+                            )
+                        }
                         when (logSection) {
-                            LogSection.WORKOUT -> LogWorkoutScreen()
-                            LogSection.DIET -> DietLogScreen()
+                            LogSection.WORKOUT -> LogWorkoutScreen(onNestedChange = { isNested = it })
+                            LogSection.DIET -> DietLogScreen(onNestedChange = { isNested = it })
                         }
                     }
                 }
-                Tab.PROFILE -> Text("Profile — coming soon")
+                Tab.PROFILE -> ProfileScreen()
             }
         }
     }

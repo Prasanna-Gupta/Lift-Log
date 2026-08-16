@@ -7,6 +7,9 @@ import dietLogsRoutes from './routes/dietLogs.js';
 import feedRoutes from './routes/feed.js';
 import streaksRoutes from './routes/streaks.js';
 import nudgesRoutes from './routes/nudges.js';
+import foodRoutes from './routes/food.js';
+import devicesRoutes from './routes/devices.js';
+import { startNudgeScheduler } from './nudgeScheduler.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -18,6 +21,8 @@ fastify.register(dietLogsRoutes);
 fastify.register(feedRoutes);
 fastify.register(streaksRoutes);
 fastify.register(nudgesRoutes);
+fastify.register(foodRoutes);
+fastify.register(devicesRoutes);
 
 const port = process.env.PORT || 3000;
 
@@ -27,3 +32,5 @@ fastify.listen({ port, host: '0.0.0.0' }, (err) => {
     process.exit(1);
   }
 });
+
+startNudgeScheduler();

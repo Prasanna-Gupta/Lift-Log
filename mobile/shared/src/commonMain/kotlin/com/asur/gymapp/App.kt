@@ -9,7 +9,7 @@ import io.github.jan.supabase.auth.status.SessionStatus
 @Composable
 @Preview
 fun App() {
-    MaterialTheme {
+    GymAppTheme { 
         val sessionStatus by supabase.auth.sessionStatus.collectAsState()
         val status = sessionStatus
 
@@ -20,6 +20,7 @@ fun App() {
             LaunchedEffect(status) {
                 profile = fetchUserProfile()
                 loading = false
+                registerFcmToken()
             }
 
             when {

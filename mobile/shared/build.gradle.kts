@@ -46,6 +46,8 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation("io.ktor:ktor-client-okhttp:3.0.3")
+            implementation("com.google.firebase:firebase-messaging-ktx:24.1.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -61,6 +63,9 @@ kotlin {
             api("io.github.jan-tennert.supabase:postgrest-kt:${supabaseVersion}")
             api("io.github.jan-tennert.supabase:compose-auth:${supabaseVersion}")
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+            implementation("io.ktor:ktor-client-core:3.0.3")
+            implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+            implementation("io.coil-kt.coil3:coil-network-ktor3:3.0.4")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

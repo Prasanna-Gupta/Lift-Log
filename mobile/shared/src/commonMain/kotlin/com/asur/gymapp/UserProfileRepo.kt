@@ -48,3 +48,10 @@ suspend fun completeOnboarding(
         BodyWeightInsert(user_id = userId, weight_kg = weightKg, date = logDateForNow())
     )
 }
+
+suspend fun fetchStreak(): StreakRow? {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return null
+    return supabase.postgrest.from("streaks")
+        .select { filter { eq("user_id", userId) } }
+        .decodeSingleOrNull<StreakRow>()
+}

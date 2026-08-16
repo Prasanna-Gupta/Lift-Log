@@ -10,27 +10,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 
 @Composable
-fun DietLogScreen() {
+fun DietLogScreen(onNestedChange: (Boolean) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<DietLogRow>>(emptyList()) }
     var targets by remember { mutableStateOf<NutritionTargets?>(null) }
     var targetsError by remember { mutableStateOf<String?>(null) }
-
-    var calories by remember { mutableStateOf("") }
-    var protein by remember { mutableStateOf("") }
-    var fat by remember { mutableStateOf("") }
-    var fiber by remember { mutableStateOf("") }
-    var mealLabel by remember { mutableStateOf("") }
-    var saving by remember { mutableStateOf(false) }
+    var showFoodSearch by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(showFoodSearch) {
+        onNestedChange(showFoodSearch)
+    }
 
     suspend fun refreshEntries() {
         val userId = supabase.auth.currentUserOrNull()?.id ?: return
@@ -81,24 +79,69 @@ fun DietLogScreen() {
         loadTargets()
     }
 
+    if (showFoodSearch) {
+        FoodSearchScreen(
+            onFoodSelected = { calories, proteinG, fatG, fiberG, label ->
+                scope.launch {
+                    errorMessage = null
+                    try {
+                        val userId = supabase.auth.currentUserOrNull()?.id ?: error("Not logged in")
+                        supabase.postgrest.from("diet_logs").insert(
+                            DietLogInsert(
+                                user_id = userId,
+                                date = logDateForNow(),
+                                calories = calories,
+                                protein_g = proteinG,
+                                fat_g = fatG,
+                                fiber_g = fiberG,
+                                meal_label = label
+                            )
+                        )
+                        refreshEntries()
+                        showFoodSearch = false
+                    } catch (e: Exception) {
+                        errorMessage = "Error: ${e.message}"
+                        showFoodSearch = false
+                    }
+                }
+            },
+            onBack = { showFoodSearch = false }
+        )
+        return
+    }
+
     val totalCalories = entries.sumOf { it.calories }
     val totalProtein = entries.sumOf { it.protein_g }
     val totalFat = entries.sumOf { it.fat_g ?: 0.0 }
     val totalFiber = entries.sumOf { it.fiber_g ?: 0.0 }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Spacer(Modifier.height(24.dp))
         Text("Log Diet", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Track today's macros",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(20.dp))
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
                 val t = targets
                 if (t != null) {
-                    Text("Today's Progress", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(12.dp))
+                    Text("Today's Progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(14.dp))
                     NutrientRow("Calories", totalCalories.toDouble(), t.targetCalories.toDouble(), "")
+                    Spacer(Modifier.height(10.dp))
                     NutrientRow("Protein", totalProtein, t.targetProteinG.toDouble(), "g")
+                    Spacer(Modifier.height(10.dp))
                     NutrientRow("Fat", totalFat, t.targetFatG.toDouble(), "g")
+                    Spacer(Modifier.height(10.dp))
                     NutrientRow("Fiber", totalFiber, t.targetFiberG.toDouble(), "g")
                 } else {
                     Row(
@@ -106,11 +149,11 @@ fun DietLogScreen() {
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("$totalCalories", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("$totalCalories", style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp), fontWeight = FontWeight.Bold)
                             Text("calories today", style = MaterialTheme.typography.bodySmall)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${totalProtein.toInt()}g", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("${totalProtein.toInt()}g", style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp), fontWeight = FontWeight.Bold)
                             Text("protein today", style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -124,118 +167,45 @@ fun DietLogScreen() {
 
         Spacer(Modifier.height(16.dp))
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("Add entry", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = mealLabel,
-                    onValueChange = { mealLabel = it },
-                    label = { Text("Meal (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                Row {
-                    OutlinedTextField(
-                        value = calories,
-                        onValueChange = { calories = it },
-                        label = { Text("Calories") },
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f).padding(end = 8.dp)
-                    )
-                    OutlinedTextField(
-                        value = protein,
-                        onValueChange = { protein = it },
-                        label = { Text("Protein (g)") },
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Row {
-                    OutlinedTextField(
-                        value = fat,
-                        onValueChange = { fat = it },
-                        label = { Text("Fat (g)") },
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f).padding(end = 8.dp)
-                    )
-                    OutlinedTextField(
-                        value = fiber,
-                        onValueChange = { fiber = it },
-                        label = { Text("Fiber (g)") },
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                errorMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.height(8.dp))
-                }
-                Button(
-                    onClick = {
-                        val cal = calories.toIntOrNull()
-                        val prot = protein.toDoubleOrNull()
-                        if (cal == null || prot == null) {
-                            errorMessage = "Enter valid calories and protein"
-                            return@Button
-                        }
-                        scope.launch {
-                            saving = true
-                            errorMessage = null
-                            try {
-                                val userId = supabase.auth.currentUserOrNull()?.id ?: error("Not logged in")
-                                supabase.postgrest.from("diet_logs").insert(
-                                    DietLogInsert(
-                                        user_id = userId,
-                                        date = logDateForNow(),
-                                        calories = cal,
-                                        protein_g = prot,
-                                        fat_g = fat.toDoubleOrNull(),
-                                        fiber_g = fiber.toDoubleOrNull(),
-                                        meal_label = mealLabel.ifBlank { null }
-                                    )
-                                )
-                                calories = ""; protein = ""; fat = ""; fiber = ""; mealLabel = ""
-                                refreshEntries()
-                            } catch (e: Exception) {
-                                errorMessage = "Error: ${e.message}"
-                            } finally {
-                                saving = false
-                            }
-                        }
-                    },
-                    enabled = !saving,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (saving) "Adding..." else "Add Entry")
-                }
-            }
+        Button(
+            onClick = { showFoodSearch = true },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Text("+ Search Food")
+        }
+
+        errorMessage?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
         Spacer(Modifier.height(16.dp))
 
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
+        ) {
             items(entries, key = { it.id }) { entry ->
-                Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(entry.meal_label ?: "Entry", fontWeight = FontWeight.Bold)
+                            Text(entry.meal_label ?: "Entry", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
                             Text(
                                 "${entry.calories} cal · ${entry.protein_g.toInt()}g protein" +
                                         (entry.fat_g?.let { " · ${it.toInt()}g fat" } ?: "") +
                                         (entry.fiber_g?.let { " · ${it.toInt()}g fiber" } ?: ""),
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         IconButton(onClick = {
@@ -244,7 +214,7 @@ fun DietLogScreen() {
                                 refreshEntries()
                             }
                         }) {
-                            Icon(Icons.Default.Close, contentDescription = "Delete")
+                            Icon(Icons.Default.Close, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -255,18 +225,25 @@ fun DietLogScreen() {
 
 @Composable
 private fun NutrientRow(label: String, current: Double, target: Double, unit: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
-            Text("${current.toInt()}$unit / ${target.toInt()}$unit", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "${current.toInt()}$unit / ${target.toInt()}$unit",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         LinearProgressIndicator(
             progress = { (current / target).toFloat().coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().height(6.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
         )
     }
 }

@@ -1,9 +1,11 @@
 package com.asur.gymapp
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -15,15 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.launch
 
 data class SetEntry(val weight: String = "", val reps: String = "")
 data class ExerciseBlock(val exercise: Exercise, val sets: MutableList<SetEntry> = mutableListOf(SetEntry()))
@@ -70,8 +72,6 @@ private fun WorkoutDraft.toPersisted(): PersistedDraft = PersistedDraft(
     }
 )
 
-// If the persisted draft is from a previous calendar day, keep the exercises/set-count
-// (it's a routine template) but blank out the actual weight/reps values.
 private fun PersistedDraft.toWorkoutDraft(): WorkoutDraft {
     val today = todayDateString()
     val isStale = lastEditedDate != today
@@ -91,7 +91,7 @@ private fun PersistedDraft.toWorkoutDraft(): WorkoutDraft {
 }
 
 @Composable
-fun LogWorkoutScreen() {
+fun LogWorkoutScreen(onNestedChange: (Boolean) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var exercises by remember { mutableStateOf<List<Exercise>>(emptyList()) }
     var drafts by remember {
@@ -105,6 +105,10 @@ fun LogWorkoutScreen() {
     var loadError by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(screenState) {
+        onNestedChange(screenState !is LogScreenState.Summary)
+    }
 
     LaunchedEffect(Unit) {
         try {
@@ -163,60 +167,88 @@ fun LogWorkoutScreen() {
             )
         }
         is LogScreenState.Summary -> {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(24.dp))
                 Text("Log Workout", style = MaterialTheme.typography.headlineMedium)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Tap a card to build your session",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(20.dp))
 
                 loadError?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(12.dp))
                 }
 
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     items(drafts, key = { it.id }) { draft ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                                .clickable { screenState = LogScreenState.Builder(draft.id) }
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(draft.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                    if (drafts.size > 1) {
-                                        IconButton(onClick = { drafts = drafts.filter { it.id != draft.id } }) {
-                                            Icon(Icons.Default.Close, contentDescription = "Remove")
-                                        }
-                                    }
-                                }
-                                Spacer(Modifier.height(4.dp))
-                                val summary = if (draft.blocks.isEmpty()) "No exercises yet"
-                                else draft.blocks.joinToString(", ") { it.exercise.name }
-                                Text(
-                                    summary,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                Button(
-                                    onClick = { screenState = LogScreenState.Builder(draft.id) },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(if (draft.blocks.isEmpty()) "Start Workout" else "Continue Workout")
-                                }
-                            }
-                        }
+                        DayCard(
+                            draft = draft,
+                            showRemove = drafts.size > 1,
+                            onOpen = { screenState = LogScreenState.Builder(draft.id) },
+                            onRemove = { drafts = drafts.filter { it.id != draft.id } }
+                        )
                     }
                 }
 
-                OutlinedButton(
+                Spacer(Modifier.height(8.dp))
+                Button(
                     onClick = { drafts = drafts + WorkoutDraft(id = newDraftId(), title = "New Workout", lastEditedDate = todayDateString()) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Text("+ New Day")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayCard(draft: WorkoutDraft, showRemove: Boolean, onOpen: () -> Unit, onRemove: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onOpen() },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(draft.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                if (showRemove) {
+                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            val summary = if (draft.blocks.isEmpty()) "No exercises yet"
+            else draft.blocks.joinToString(", ") { it.exercise.name }
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
+            )
+            Spacer(Modifier.height(14.dp))
+            Button(
+                onClick = onOpen,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = if (draft.blocks.isEmpty())
+                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                else ButtonDefaults.buttonColors()
+            ) {
+                Text(if (draft.blocks.isEmpty()) "Start Workout" else "Continue Workout")
             }
         }
     }
@@ -236,24 +268,29 @@ private fun WorkoutBuilderScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
+            Spacer(Modifier.width(4.dp))
             OutlinedTextField(
                 value = title,
                 onValueChange = onTitleChange,
                 singleLine = true,
+                textStyle = MaterialTheme.typography.titleLarge,
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.weight(1f)
             )
         }
 
-        LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             items(blocks, key = { it.exercise.id }) { block ->
-                Spacer(Modifier.height(16.dp))
-                ExerciseTableSection(
+                ExerciseTableCard(
                     block = block,
                     onChanged = { updated ->
                         onBlocksChange(blocks.map { if (it.exercise.id == block.exercise.id) updated else it })
@@ -264,23 +301,27 @@ private fun WorkoutBuilderScreen(
                 )
             }
             item {
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(onClick = onAddExercise, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onAddExercise,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium
+                ) {
                     Text("+ Add Exercise")
                 }
-                Spacer(Modifier.height(80.dp))
+                Spacer(Modifier.height(90.dp))
             }
         }
 
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
             statusMessage?.let {
-                Text(it)
+                Text(it, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(8.dp))
             }
             Button(
                 onClick = onSave,
                 enabled = blocks.isNotEmpty() && !saving,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = MaterialTheme.shapes.large
             ) {
                 Text(if (saving) "Saving..." else "Save Workout")
             }
@@ -289,71 +330,96 @@ private fun WorkoutBuilderScreen(
 }
 
 @Composable
-private fun ExerciseTableSection(block: ExerciseBlock, onChanged: (ExerciseBlock) -> Unit, onRemove: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(block.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove exercise")
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text("SET", modifier = Modifier.width(40.dp), style = MaterialTheme.typography.labelMedium)
-            Text("KG", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
-            Text("REPS", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.width(40.dp))
-        }
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-        block.sets.forEachIndexed { index, set ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                Text("${index + 1}", modifier = Modifier.width(40.dp))
-                OutlinedTextField(
-                    value = set.weight,
-                    onValueChange = { newVal ->
-                        val updated = block.sets.toMutableList()
-                        updated[index] = set.copy(weight = newVal)
-                        onChanged(block.copy(sets = updated))
-                    },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f).padding(end = 8.dp)
-                )
-                OutlinedTextField(
-                    value = set.reps,
-                    onValueChange = { newVal ->
-                        val updated = block.sets.toMutableList()
-                        updated[index] = set.copy(reps = newVal)
-                        onChanged(block.copy(sets = updated))
-                    },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = {
-                        val updated = block.sets.toMutableList()
-                        updated.removeAt(index)
-                        if (updated.isEmpty()) updated.add(SetEntry())
-                        onChanged(block.copy(sets = updated))
-                    },
-                    modifier = Modifier.width(40.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove set")
+private fun ExerciseTableCard(block: ExerciseBlock, onChanged: (ExerciseBlock) -> Unit, onRemove: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(36.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("💪", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(block.exercise.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove exercise", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-        }
+            Spacer(Modifier.height(12.dp))
 
-        TextButton(onClick = {
-            onChanged(block.copy(sets = (block.sets + SetEntry()).toMutableList()))
-        }) {
-            Text("+ Add Set")
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("SET", modifier = Modifier.width(40.dp), style = MaterialTheme.typography.labelMedium)
+                Text("KG", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                Text("REPS", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(40.dp))
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+
+            block.sets.forEachIndexed { index, set ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                    Box(
+                        modifier = Modifier.width(40.dp).height(32.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.small),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("${index + 1}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    OutlinedTextField(
+                        value = set.weight,
+                        onValueChange = { newVal ->
+                            val updated = block.sets.toMutableList()
+                            updated[index] = set.copy(weight = newVal)
+                            onChanged(block.copy(sets = updated))
+                        },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    )
+                    OutlinedTextField(
+                        value = set.reps,
+                        onValueChange = { newVal ->
+                            val updated = block.sets.toMutableList()
+                            updated[index] = set.copy(reps = newVal)
+                            onChanged(block.copy(sets = updated))
+                        },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            val updated = block.sets.toMutableList()
+                            updated.removeAt(index)
+                            if (updated.isEmpty()) updated.add(SetEntry())
+                            onChanged(block.copy(sets = updated))
+                        },
+                        modifier = Modifier.width(40.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove set", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            TextButton(onClick = {
+                onChanged(block.copy(sets = (block.sets + SetEntry()).toMutableList()))
+            }) {
+                Text("+ Add Set")
+            }
         }
     }
 }
@@ -384,7 +450,7 @@ private fun ExercisePickerScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -398,42 +464,44 @@ private fun ExercisePickerScreen(
             onValueChange = { query = it },
             label = { Text("Search exercises") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            OutlinedButton(onClick = { showEquipmentDialog = true }, modifier = Modifier.weight(1f)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            OutlinedButton(onClick = { showEquipmentDialog = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium) {
                 Text(equipmentFilter ?: "All Equipment")
             }
             Spacer(Modifier.width(8.dp))
-            OutlinedButton(onClick = { showMuscleDialog = true }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { showMuscleDialog = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.medium) {
                 Text(muscleFilter ?: "All Muscles")
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
             items(filtered, key = { it.id }) { exercise ->
                 val alreadyAdded = exercise.id in alreadySelected
                 ListItem(
                     headlineContent = { Text(exercise.name) },
                     supportingContent = {
                         val details = listOfNotNull(exercise.muscle_group, exercise.equipment_type).joinToString(" · ")
-                        if (details.isNotBlank()) Text(details)
+                        if (details.isNotBlank()) Text(details, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
-                    trailingContent = { if (alreadyAdded) Text("Added") },
+                    trailingContent = { if (alreadyAdded) Text("Added", color = MaterialTheme.colorScheme.primary) },
+                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                     modifier = if (!alreadyAdded) Modifier.clickable { onSelect(exercise) } else Modifier
                 )
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
     }
 
     if (showMuscleDialog) {
-        FilterDialog(
+        FilterSheet(
             title = "Muscle Group",
             options = muscles,
             onSelect = { muscleFilter = it; showMuscleDialog = false },
@@ -441,7 +509,7 @@ private fun ExercisePickerScreen(
         )
     }
     if (showEquipmentDialog) {
-        FilterDialog(
+        FilterSheet(
             title = "Equipment",
             options = equipmentOptions,
             onSelect = { equipmentFilter = it; showEquipmentDialog = false },
@@ -451,27 +519,38 @@ private fun ExercisePickerScreen(
 }
 
 @Composable
-private fun FilterDialog(
+@OptIn(ExperimentalMaterial3Api::class)
+private fun FilterSheet(
     title: String,
     options: List<String>,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            LazyColumn {
-                item {
-                    TextButton(onClick = { onSelect(null) }, modifier = Modifier.fillMaxWidth()) { Text("All") }
-                }
-                items(options) { option ->
-                    TextButton(onClick = { onSelect(option) }, modifier = Modifier.fillMaxWidth()) { Text(option) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(20.dp).padding(bottom = 24.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = false,
+                    onClick = { onSelect(null) },
+                    label = { Text("All") },
+                    shape = MaterialTheme.shapes.large
+                )
+                options.forEach { option ->
+                    FilterChip(
+                        selected = false,
+                        onClick = { onSelect(option) },
+                        label = { Text(option) },
+                        shape = MaterialTheme.shapes.large
+                    )
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
-    )
+        }
+    }
 }
 
 suspend fun saveWorkout(title: String, blocks: List<ExerciseBlock>) {
