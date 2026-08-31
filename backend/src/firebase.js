@@ -12,15 +12,20 @@ const app = initializeApp({
 
 const messaging = getMessaging(app);
 
+// Always returns a consistent shape: { success, staleToken? }
+// staleToken is set when Firebase confirms the token is dead, so callers can clean it up.
 export async function sendPushNotification(fcmToken, title, body) {
   try {
     await messaging.send({
       token: fcmToken,
       notification: { title, body },
     });
-    return true;
+    return { success: true };
   } catch (err) {
     console.error(`Failed to send push to token ${fcmToken.slice(0, 12)}...:`, err.message);
-    return false;
+    if (err.code === 'messaging/registration-token-not-registered') {
+      return { success: false, staleToken: fcmToken };
+    }
+    return { success: false };
   }
 }

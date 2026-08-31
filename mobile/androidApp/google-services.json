@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1088444055872",
+    "project_id": "liftlog-a7541",
+    "storage_bucket": "liftlog-a7541.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1088444055872:android:cd6cb0b5ad439e50e0faa5",
+        "android_client_info": {
+          "package_name": "com.asur.gymapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoY7DcQA8N6p1z4bj6CJUKlucWySd2P9k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

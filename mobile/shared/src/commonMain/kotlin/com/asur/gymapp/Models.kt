@@ -43,8 +43,8 @@ data class ExerciseNameOnly(val name: String)
 @Serializable
 data class WorkoutSetWithExercise(
     val set_number: Int,
-    val weight: Double,
-    val reps: Int,
+    val weight: Double? = null,
+    val reps: Int? = null,
     val exercises: ExerciseNameOnly? = null
 )
 
@@ -54,6 +54,15 @@ data class WorkoutWithSets(
     val title: String? = null,
     val date: String,
     val workout_sets: List<WorkoutSetWithExercise> = emptyList()
+)
+
+@Serializable
+data class SetWithExercise(
+    val workout_id: String,
+    val exercise_id: String,
+    val weight: Double? = null,
+    val reps: Int? = null,
+    val exercises: ExerciseNameOnly? = null
 )
 
 @Serializable
@@ -88,19 +97,29 @@ data class UserProfileUpdate(
     val gender: String? = null,
     val activity_level: String? = null,
     val goal: String? = null,
+    val nudge_cutoff_time: String? = null,
+    val nudge_enabled: Boolean? = null,
     val unit_preference: String? = null,
+    val feed_visible: Boolean? = null,
     val onboarding_completed: Boolean? = null
 )
 
 @Serializable
 data class UserProfileRow(
     val id: String,
+    val name: String? = null,
+    val email: String? = null,
+    val avatar_url: String? = null,
     val height_cm: Double? = null,
     val date_of_birth: String? = null,
     val gender: String? = null,
     val activity_level: String? = null,
     val goal: String? = null,
     val unit_preference: String = "metric",
+    val nudge_cutoff_time: String? = null,
+    val nudge_enabled: Boolean? = null,
+    val feed_visible: Boolean? = null,
+    val created_at: String? = null,
     val onboarding_completed: Boolean = false
 )
 
@@ -159,3 +178,21 @@ data class StreakRow(
     val last_logged_date: String? = null,
     val warning_used: Boolean = false
 )
+
+@Serializable
+data class WorkoutTemplateInsert(val user_id: String, val name: String)
+
+@Serializable
+data class WorkoutTemplateRow(val id: String, val user_id: String, val name: String)
+
+@Serializable
+data class TemplateExerciseInsert(val template_id: String, val exercise_id: String, val position: Int)
+
+@Serializable
+data class TemplateExerciseWithDetails(val position: Int, val exercises: Exercise? = null)
+
+@Serializable
+data class ProgressPhotoInsert(val user_id: String, val storage_path: String, val date: String)
+
+@Serializable
+data class ProgressPhotoRow(val id: String, val storage_path: String, val date: String)
