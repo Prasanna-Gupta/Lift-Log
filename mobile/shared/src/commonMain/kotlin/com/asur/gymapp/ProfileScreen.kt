@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -54,10 +55,12 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
     var editing by remember { mutableStateOf(false) }
     var showPhotos by remember { mutableStateOf(false) }
     var showProgress by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
+    var unreadCount by remember { mutableStateOf(0) }
     var activeDates by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    LaunchedEffect(editing, showPhotos, showProgress) {
-        onNestedChange(editing || showPhotos || showProgress)
+    LaunchedEffect(editing, showPhotos, showProgress, showNotifications) {
+        onNestedChange(editing || showPhotos || showProgress || showNotifications)
     }
 
     suspend fun loadAll() {
@@ -66,6 +69,7 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
         profile = fetchUserProfile()
         weightKg = fetchLatestWeightKg()
         workoutCount = fetchWorkoutCount()
+        unreadCount = fetchUnreadNotificationCount()
         loading = false
     }
 
@@ -78,6 +82,14 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
 
     if (showPhotos) {
         ProgressPhotosScreen(onBack = { showPhotos = false })
+        return
+    }
+
+    if (showNotifications) {
+        NotificationsScreen(onBack = {
+            showNotifications = false
+            scope.launch { unreadCount = fetchUnreadNotificationCount() }
+        })
         return
     }
 
@@ -286,6 +298,8 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        ActionRow(Icons.Filled.Notifications, "Notifications", badgeCount = unreadCount) { showNotifications = true }
+                        HorizontalDivider(color = AppColors.Divider)
                         ActionRow(Icons.Filled.ShowChart, "View progress") { showProgress = true }
                         ActionRow(Icons.Filled.PhotoCamera, "Progress photos", showDivider = false) { showPhotos = true }
                     }
@@ -596,6 +610,7 @@ private fun DetailRow(label: String, value: String, showDivider: Boolean = true)
 private fun ActionRow(
     icon: ImageVector,
     label: String,
+    badgeCount: Int = 0,
     showDivider: Boolean = true,
     onClick: () -> Unit
 ) {
@@ -606,6 +621,22 @@ private fun ActionRow(
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(13.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        if (badgeCount > 0) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(horizontal = 7.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    if (badgeCount > 9) "9+" else "$badgeCount",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp, fontSize = 11.sp),
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF4A1B0C)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
