@@ -68,6 +68,7 @@ kotlin {
             implementation("io.coil-kt.coil3:coil-compose:3.0.4")
             implementation("io.coil-kt.coil3:coil-network-ktor3:3.0.4")
             api("io.github.jan-tennert.supabase:storage-kt:3.3.0")
+            implementation("com.russhwolf:multiplatform-settings-no-arg:1.3.0")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

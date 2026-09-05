@@ -24,7 +24,7 @@ private data class WorkoutIdOnly(val workout_id: String)
  * count toward streaks, heatmaps, workout counts, or "trained today" status.
  * Chunked so the request URL can't overflow as history grows.
  */
-private suspend fun workoutIdsWithSets(workoutIds: List<String>): Set<String> {
+suspend fun workoutIdsWithSets(workoutIds: List<String>): Set<String> {
     if (workoutIds.isEmpty()) return emptySet()
     return workoutIds.chunked(40).flatMap { batch ->
         supabase.postgrest.from("workout_sets")

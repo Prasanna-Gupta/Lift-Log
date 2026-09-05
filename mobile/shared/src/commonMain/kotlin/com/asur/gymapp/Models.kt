@@ -196,3 +196,28 @@ data class ProgressPhotoInsert(val user_id: String, val storage_path: String, va
 
 @Serializable
 data class ProgressPhotoRow(val id: String, val storage_path: String, val date: String)
+
+data class TemplateCountRow(
+    val template_id: String,
+    val exercise_count: Long
+)
+
+@Serializable
+data class ProfileSummaryRow(
+    val user_id: String,
+    val name: String? = null,
+    val email: String? = null,
+    val avatar_url: String? = null,
+    val created_at: String? = null,
+    val height_cm: Double? = null,
+    val date_of_birth: String? = null,
+    val activity_level: String? = null,
+    val goal: String? = null,
+    val feed_visible: Boolean? = null,
+    val latest_weight_kg: Double? = null,
+    val current_streak: Int? = null,
+    val longest_streak: Int? = null,
+    val last_logged_date: String? = null,
+    val warning_used: Boolean? = null,
+    val workout_count: Long? = null
+)

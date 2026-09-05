@@ -3,17 +3,24 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { readFileSync } from 'fs';
 import 'dotenv/config';
 
-const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './firebase-service-account.json';
-const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf-8'));
+function loadServiceAccount() {
+  // Deployed: service account JSON is base64-encoded into an env var,
+  // since the raw credential file can't be committed to git.
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    const json = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8');
+    return JSON.parse(json);
+  }
+  // Local dev: fall back to the gitignored file directly, unchanged from before.
+  const path = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './firebase-service-account.json';
+  return JSON.parse(readFileSync(path, 'utf-8'));
+}
 
+const serviceAccount = loadServiceAccount();
 const app = initializeApp({
   credential: cert(serviceAccount),
 });
-
 const messaging = getMessaging(app);
 
-// Always returns a consistent shape: { success, staleToken? }
-// staleToken is set when Firebase confirms the token is dead, so callers can clean it up.
 export async function sendPushNotification(fcmToken, title, body) {
   try {
     await messaging.send({

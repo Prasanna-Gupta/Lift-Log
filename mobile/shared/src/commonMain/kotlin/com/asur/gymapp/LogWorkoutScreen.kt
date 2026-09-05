@@ -22,6 +22,9 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.DayOfWeek
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import androidx.compose.foundation.border
@@ -41,6 +44,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+
 data class SetEntry(val weight: String = "", val reps: String = "")
 data class ExerciseBlock(val exercise: Exercise, val sets: MutableList<SetEntry> = mutableListOf(SetEntry()))
 data class WorkoutDraft(val id: String, val title: String, val blocks: List<ExerciseBlock> = emptyList(), val lastEditedDate: String)
@@ -265,9 +272,13 @@ fun LogWorkoutScreen(onNestedChange: (Boolean) -> Unit = {}) {
                 LaunchedEffect(Unit) {
                     val fetched = fetchTemplates()
                     templates = fetched
-                    templateCounts = fetched.associate { t ->
-                        t.id to runCatching { fetchTemplateExercises(t.id).size }.getOrDefault(0)
-                    }
+                    val userId = supabase.auth.currentUserOrNull()?.id
+                    templateCounts = if (userId != null) {
+                        val params = buildJsonObject { put("p_user_id", JsonPrimitive(userId)) }
+                        supabase.postgrest.rpc("get_template_counts", params)
+                            .decodeList<TemplateCountRow>()
+                            .associate { it.template_id to it.exercise_count.toInt() }
+                    } else emptyMap()
                     loadingTemplates = false
                 }
 
@@ -986,42 +997,37 @@ private fun FilterOptionChip(label: String, active: Boolean, onClick: () -> Unit
 data class SaveResult(val newStreak: Int, val wasComeback: Boolean)
 
 suspend fun saveWorkout(title: String, blocks: List<ExerciseBlock>) {
-    val userId = supabase.auth.currentUserOrNull()?.id ?: error("Not logged in")
     val logDate = logDateForNow()
 
-    val workout = supabase.postgrest.from("workouts")
-        .upsert(WorkoutInsert(user_id = userId, date = logDate, title = title)) {
-            onConflict = "user_id, date, title"
-            select()
-        }
-        .decodeSingle<WorkoutRow>()
-
-    supabase.postgrest.from("workout_sets").delete {
-        filter { eq("workout_id", workout.id) }
-    }
-
-    val setInserts = blocks.flatMap { block ->
-        block.sets.mapIndexedNotNull { index, set ->
-            val weight = set.weight.toDoubleOrNull()
-            val reps = set.reps.toIntOrNull()
-            if (weight != null && reps != null) {
-                WorkoutSetInsert(
-                    workout_id = workout.id,
-                    exercise_id = block.exercise.id,
-                    set_number = index + 1,
-                    weight = weight,
-                    reps = reps
-                )
-            } else null
+    val setsJson = buildJsonArray {
+        blocks.forEach { block ->
+            block.sets.forEachIndexed { index, set ->
+                val weight = set.weight.toDoubleOrNull()
+                val reps = set.reps.toIntOrNull()
+                if (weight != null && reps != null) {
+                    addJsonObject {
+                        put("exercise_id", block.exercise.id)
+                        put("set_number", index + 1)
+                        put("weight", weight)
+                        put("reps", reps)
+                    }
+                }
+            }
         }
     }
-    if (setInserts.isNotEmpty()) {
-        supabase.postgrest.from("workout_sets").insert(setInserts)
-    }
+
+    val workout = supabase.postgrest.rpc(
+        "save_workout_with_sets",
+        buildJsonObject {
+            put("p_title", title)
+            put("p_date", logDate)
+            put("p_sets", setsJson)
+        }
+    ).decodeAs<WorkoutRow>()
 
     if (blocks.isNotEmpty()) {
         val template = supabase.postgrest.from("workout_templates")
-            .upsert(WorkoutTemplateInsert(user_id = userId, name = title)) {
+            .upsert(WorkoutTemplateInsert(user_id = supabase.auth.currentUserOrNull()!!.id, name = title)) {
                 onConflict = "user_id, name"
                 select()
             }
