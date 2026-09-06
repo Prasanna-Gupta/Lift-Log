@@ -9,7 +9,7 @@ import kotlinx.serialization.json.Json
 
 // Replace with your machine's LAN IP for real device testing, or 10.0.2.2 for the Android emulator.
 // localhost from the PHONE means the phone itself, not your laptop.
-const val BACKEND_BASE_URL = "https://lift-log-production-9885.up.railway.app"
+const val BACKEND_BASE_URL = "https://lift-log-9yxs.onrender.com"
 
 private val httpClient = HttpClient()
 private val json = Json { ignoreUnknownKeys = true }

@@ -1,5 +1,4 @@
 package com.asur.gymapp
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -58,9 +57,10 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
     var showNotifications by remember { mutableStateOf(false) }
     var unreadCount by remember { mutableStateOf(0) }
     var activeDates by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showLogWeight by remember { mutableStateOf(false) }
 
-    LaunchedEffect(editing, showPhotos, showProgress, showNotifications) {
-        onNestedChange(editing || showPhotos || showProgress || showNotifications)
+    LaunchedEffect(editing, showPhotos, showProgress, showNotifications, showLogWeight) {
+        onNestedChange(editing || showPhotos || showProgress || showNotifications || showLogWeight)
     }
 
     suspend fun loadAll() {
@@ -72,19 +72,16 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
         unreadCount = fetchUnreadNotificationCount()
         loading = false
     }
-
     LaunchedEffect(Unit) { loadAll() }
 
     if (showProgress) {
         ProgressScreen(onBack = { showProgress = false })
         return
     }
-
     if (showPhotos) {
         ProgressPhotosScreen(onBack = { showPhotos = false })
         return
     }
-
     if (showNotifications) {
         NotificationsScreen(onBack = {
             showNotifications = false
@@ -92,7 +89,6 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
         })
         return
     }
-
     if (editing) {
         val p = profile
         if (p != null) {
@@ -114,7 +110,6 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
         ) {
             Spacer(Modifier.height(28.dp))
-
             if (loading) {
                 Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -122,7 +117,6 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
             } else {
                 val p = profile
                 val s = streak
-
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                     if (p?.avatar_url != null) {
                         AsyncImage(
@@ -171,9 +165,7 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                         )
                     }
                 }
-
                 Spacer(Modifier.height(22.dp))
-
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
@@ -222,9 +214,7 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                         StreakHeatmap(activeDates = activeDates)
                     }
                 }
-
                 Spacer(Modifier.height(18.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -235,7 +225,6 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                     MetaDivider()
                     MetaItem(Modifier.weight(1f), formatMonthYear(p?.created_at), "member since")
                 }
-
                 Spacer(Modifier.height(24.dp))
                 Text("DETAILS", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
                 Spacer(Modifier.height(8.dp))
@@ -245,7 +234,18 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        DetailRow("Weight", weightKg?.let { "${it.oneDecimal()} kg" } ?: "—")
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { showLogWeight = true }.padding(vertical = 13.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Weight", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(weightKg?.let { "${it.oneDecimal()} kg" } ?: "—", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.width(6.dp))
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Log weight", tint = AppColors.TextTertiary, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        HorizontalDivider(color = AppColors.Divider)
                         DetailRow("Height", p?.height_cm?.let { "${it.toInt()} cm" } ?: "—")
                         DetailRow("Age", p?.date_of_birth?.let { "${ageFromDob(LocalDate.parse(it))}" } ?: "—")
                         DetailRow(
@@ -259,7 +259,6 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                         )
                     }
                 }
-
                 Spacer(Modifier.height(20.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -290,7 +289,6 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                         )
                     }
                 }
-
                 Spacer(Modifier.height(20.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -304,18 +302,27 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                         ActionRow(Icons.Filled.PhotoCamera, "Progress photos", showDivider = false) { showPhotos = true }
                     }
                 }
-
                 Spacer(Modifier.height(22.dp))
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     TextButton(onClick = { scope.launch { supabase.auth.signOut() } }) {
                         Text("Sign out", style = MaterialTheme.typography.bodyMedium, color = AppColors.Destructive)
                     }
                 }
-
                 Spacer(Modifier.height(120.dp))
             }
         }
         BottomFadeOverlay()
+    }
+
+    if (showLogWeight) {
+        LogWeightSheet(
+            currentWeightKg = weightKg,
+            onDismiss = { showLogWeight = false },
+            onSaved = {
+                showLogWeight = false
+                scope.launch { loadAll() }
+            }
+        )
     }
 }
 
@@ -328,10 +335,8 @@ fun EditProfileScreen(
     onSaved: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-
     var weightIsKg by remember { mutableStateOf(profile.unit_preference != "imperial") }
     var heightIsCm by remember { mutableStateOf(profile.unit_preference != "imperial") }
-
     var weightText by remember {
         mutableStateOf(
             if (weightIsKg) currentWeightKg.oneDecimal()
@@ -344,22 +349,18 @@ fun EditProfileScreen(
     var heightInText by remember {
         mutableStateOf(((startCm / 2.54) - (startCm / 30.48).toInt() * 12).roundToInt().toString())
     }
-
     var activityLevel by remember { mutableStateOf(profile.activity_level?.let { runCatching { ActivityLevel.valueOf(it) }.getOrNull() }) }
     var goal by remember { mutableStateOf(profile.goal?.let { runCatching { Goal.valueOf(it) }.getOrNull() }) }
-
     var showActivitySheet by remember { mutableStateOf(false) }
     var showGoalSheet by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var dirty by remember { mutableStateOf(false) }
-
     fun resolvedWeightKg(): Double? {
         val v = weightText.toDoubleOrNull() ?: return null
         return if (weightIsKg) v else v / 2.20462
     }
-
     fun resolvedHeightCm(): Double? {
         return if (heightIsCm) {
             heightCmText.toDoubleOrNull()
@@ -369,13 +370,10 @@ fun EditProfileScreen(
             (ft * 12 + inch) * 2.54
         }
     }
-
     fun attemptBack() {
         if (dirty) showDiscardDialog = true else onBack()
     }
-
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 26.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -388,9 +386,7 @@ fun EditProfileScreen(
             Spacer(Modifier.width(14.dp))
             Text("Edit profile", style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp), fontWeight = FontWeight.Medium)
         }
-
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-
             Text("MEASUREMENTS", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
             Spacer(Modifier.height(8.dp))
             Card(
@@ -399,7 +395,6 @@ fun EditProfileScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -426,9 +421,7 @@ fun EditProfileScreen(
                             }
                         )
                     }
-
                     HorizontalDivider(color = AppColors.Divider)
-
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -477,9 +470,7 @@ fun EditProfileScreen(
                     }
                 }
             }
-
             Spacer(Modifier.height(22.dp))
-
             Text("TRAINING", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
             Spacer(Modifier.height(8.dp))
             Card(
@@ -493,13 +484,11 @@ fun EditProfileScreen(
                     PickerRow("Goal", goal?.label ?: "Choose") { showGoalSheet = true }
                 }
             }
-
             errorMessage?.let {
                 Spacer(Modifier.height(14.dp))
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 4.dp))
             }
         }
-
         Button(
             onClick = {
                 val kg = resolvedWeightKg()
@@ -538,7 +527,6 @@ fun EditProfileScreen(
         }
         Spacer(Modifier.height(124.dp))
     }
-
     if (showActivitySheet) {
         OptionSheet(
             title = "Activity level",
@@ -548,7 +536,6 @@ fun EditProfileScreen(
             onSelect = { activityLevel = ActivityLevel.entries[it]; dirty = true; showActivitySheet = false }
         )
     }
-
     if (showGoalSheet) {
         OptionSheet(
             title = "Goal",
@@ -558,7 +545,6 @@ fun EditProfileScreen(
             onSelect = { goal = Goal.entries[it]; dirty = true; showGoalSheet = false }
         )
     }
-
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -588,12 +574,10 @@ private fun MetaItem(modifier: Modifier = Modifier, value: String, label: String
         Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
-
 @Composable
 private fun MetaDivider() {
     Box(modifier = Modifier.width(1.dp).height(26.dp).background(AppColors.Divider))
 }
-
 @Composable
 private fun DetailRow(label: String, value: String, showDivider: Boolean = true) {
     Row(
@@ -605,7 +589,6 @@ private fun DetailRow(label: String, value: String, showDivider: Boolean = true)
     }
     if (showDivider) HorizontalDivider(color = AppColors.Divider)
 }
-
 @Composable
 private fun ActionRow(
     icon: ImageVector,
@@ -645,7 +628,6 @@ private fun ActionRow(
         )
     }
 }
-
 @Composable
 private fun InlineNumberField(value: String, onValueChange: (String) -> Unit, widthDp: Int) {
     var focused by remember { mutableStateOf(false) }
@@ -675,7 +657,6 @@ private fun InlineNumberField(value: String, onValueChange: (String) -> Unit, wi
             .padding(bottom = 3.dp)
     )
 }
-
 @Composable
 private fun UnitToggle(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
     Row(
@@ -703,7 +684,6 @@ private fun UnitToggle(options: List<String>, selectedIndex: Int, onSelect: (Int
         }
     }
 }
-
 @Composable
 private fun PickerRow(label: String, value: String, onClick: () -> Unit) {
     Row(
@@ -721,7 +701,6 @@ private fun PickerRow(label: String, value: String, onClick: () -> Unit) {
         )
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OptionSheet(
@@ -753,6 +732,92 @@ private fun OptionSheet(
                 if (i < options.lastIndex) HorizontalDivider(color = AppColors.Divider)
             }
             Spacer(Modifier.height(30.dp))
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LogWeightSheet(currentWeightKg: Double?, onDismiss: () -> Unit, onSaved: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var weightText by remember { mutableStateOf(currentWeightKg?.oneDecimal() ?: "") }
+    var saving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            Box(
+                modifier = Modifier.padding(top = 10.dp).width(36.dp).height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)).background(AppColors.Divider)
+            )
+        }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            Text("Log weight", style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp), fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                "Today, ${formatDayMonth(logDateForNow())}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BasicTextField(
+                    value = weightText,
+                    onValueChange = { raw -> weightText = raw.filter { it.isDigit() || it == '.' }.take(6) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f).padding(vertical = 14.dp)
+                )
+                Text("kg", style = MaterialTheme.typography.bodyMedium, color = AppColors.TextTertiary)
+            }
+            errorMessage?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(Modifier.height(16.dp))
+            val weight = weightText.toDoubleOrNull()
+            val valid = weight != null && weight in 20.0..400.0
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (valid && !saving) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = valid && !saving) {
+                        scope.launch {
+                            saving = true
+                            errorMessage = null
+                            try {
+                                logWeightQuick(weight!!)
+                                onSaved()
+                            } catch (e: Exception) {
+                                errorMessage = "Couldn't save. ${e.message}"
+                            } finally {
+                                saving = false
+                            }
+                        }
+                    }
+                    .padding(vertical = 14.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    if (saving) "Saving" else "Save",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = if (valid && !saving) Color(0xFF4A1B0C) else AppColors.TextTertiary
+                )
+            }
         }
     }
 }

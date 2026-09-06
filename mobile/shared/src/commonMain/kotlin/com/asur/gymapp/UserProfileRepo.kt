@@ -74,9 +74,9 @@ suspend fun completeOnboarding(
             onboarding_completed = true
         )
     ) { filter { eq("id", userId) } }
-    supabase.postgrest.from("body_weight_logs").insert(
+    supabase.postgrest.from("body_weight_logs").upsert(
         BodyWeightInsert(user_id = userId, weight_kg = weightKg, date = logDateForNow())
-    )
+    ) { onConflict = "user_id, date" }
 }
 
 suspend fun fetchStreak(): StreakRow? {
@@ -113,9 +113,9 @@ suspend fun updateProfileDetails(weightKg: Double, heightCm: Double, activityLev
     supabase.postgrest.from("users").update(
         UserProfileUpdate(height_cm = heightCm, activity_level = activityLevel, goal = goal)
     ) { filter { eq("id", userId) } }
-    supabase.postgrest.from("body_weight_logs").insert(
+    supabase.postgrest.from("body_weight_logs").upsert(
         BodyWeightInsert(user_id = userId, weight_kg = weightKg, date = logDateForNow())
-    )
+    ) { onConflict = "user_id, date" }
 }
 
 suspend fun fetchTemplates(): List<WorkoutTemplateRow> {

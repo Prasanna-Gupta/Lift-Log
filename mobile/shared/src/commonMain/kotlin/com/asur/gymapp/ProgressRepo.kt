@@ -28,7 +28,8 @@ data class ProgressSummary(
     val dailyVolumeLast7: Map<LocalDate, Double>,
     val weeklyVolumeThisMonth: List<Pair<LocalDate, Double>>,
     val monthlyVolumeAllTime: List<Pair<LocalDate, Double>>,
-    val prsSetThisWeek: Int
+    val prsSetThisWeek: Int,
+    val weightHistory: List<Pair<LocalDate, Double>>
 )
 
 private val emptySummary = ProgressSummary(
@@ -42,7 +43,8 @@ private val emptySummary = ProgressSummary(
     dailyVolumeLast7 = emptyMap(),
     weeklyVolumeThisMonth = emptyList(),
     monthlyVolumeAllTime = emptyList(),
-    prsSetThisWeek = 0
+    prsSetThisWeek = 0,
+    weightHistory = emptyList()
 )
 
 // Epley formula — standard, simple estimated 1RM calculation
@@ -61,12 +63,12 @@ private fun startOfMonth(day: LocalDate): LocalDate =
 
 suspend fun fetchProgressSummary(): ProgressSummary {
     val userId = supabase.auth.currentUserOrNull()?.id ?: return emptySummary
+    val weightHistory = fetchWeightHistory()
 
     val workouts = supabase.postgrest.from("workouts")
         .select { filter { eq("user_id", userId) } }
         .decodeList<WorkoutRow>()
-
-    if (workouts.isEmpty()) return emptySummary
+    if (workouts.isEmpty()) return emptySummary.copy(weightHistory = weightHistory)
 
     val workoutDateById = workouts.mapNotNull { w ->
         runCatching { LocalDate.parse(w.date) }.getOrNull()?.let { w.id to it }
@@ -165,6 +167,26 @@ suspend fun fetchProgressSummary(): ProgressSummary {
         dailyVolumeLast7 = dailyVolume,
         weeklyVolumeThisMonth = weeklyVolumeThisMonth,
         monthlyVolumeAllTime = monthlyVolumeAllTime,
-        prsSetThisWeek = prs.count { it.achievedOn != null && it.achievedOn >= weekStart }
+        prsSetThisWeek = prs.count { it.achievedOn != null && it.achievedOn >= weekStart },
+        weightHistory = weightHistory
     )
+}
+
+suspend fun fetchWeightHistory(): List<Pair<LocalDate, Double>> {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return emptyList()
+    return supabase.postgrest.from("body_weight_logs")
+        .select {
+            filter { eq("user_id", userId) }
+            order("date", io.github.jan.supabase.postgrest.query.Order.ASCENDING)
+        }
+        .decodeList<BodyWeightRow>()
+        .mapNotNull { row -> runCatching { LocalDate.parse(row.date) }.getOrNull()?.let { it to row.weight_kg } }
+}
+
+suspend fun logWeightQuick(weightKg: Double) {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: error("Not logged in")
+    supabase.postgrest.from("body_weight_logs")
+        .upsert(BodyWeightInsert(user_id = userId, weight_kg = weightKg, date = logDateForNow())) {
+            onConflict = "user_id, date"
+        }
 }

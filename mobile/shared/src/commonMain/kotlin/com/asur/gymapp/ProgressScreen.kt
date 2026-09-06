@@ -200,6 +200,42 @@ fun ProgressScreen(onBack: () -> Unit) {
                             )
                         }
                     }
+
+                    Spacer(Modifier.height(18.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+                            Text("Body weight", style = MaterialTheme.typography.labelSmall)
+                            Spacer(Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    s.weightHistory.lastOrNull()?.second?.oneDecimal() ?: "—",
+                                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 34.sp),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(Modifier.width(7.dp))
+                                Text(
+                                    "kg",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(18.dp))
+                            val filteredWeights = remember(s.weightHistory, range) {
+                                val cutoff = when (range) {
+                                    Range.WEEK -> LocalDate.parse(logDateForNow()).minus(DatePeriod(days = 6))
+                                    Range.MONTH -> LocalDate.parse(logDateForNow()).minus(DatePeriod(days = 29))
+                                    Range.ALL -> null
+                                }
+                                if (cutoff == null) s.weightHistory else s.weightHistory.filter { it.first >= cutoff }
+                            }
+                            WeightTrendChart(points = filteredWeights)
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(18.dp))

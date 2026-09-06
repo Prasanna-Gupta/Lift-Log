@@ -60,6 +60,7 @@ data class WorkoutWithSets(
 data class SetWithExercise(
     val workout_id: String,
     val exercise_id: String,
+    val set_number: Int? = null,
     val weight: Double? = null,
     val reps: Int? = null,
     val exercises: ExerciseNameOnly? = null
@@ -162,6 +163,7 @@ data class FeedItem(
     val user_name: String,
     val activity_type: String,
     val created_at: String,
+    val reference_id: String? = null,
     val workout_title: String? = null,
     val workout_exercise_count: Int? = null,
     val meal_label: String? = null,

@@ -34,6 +34,7 @@ fun ProgressPhotosScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var photos by remember { mutableStateOf<List<ProgressPhotoRow>>(emptyList()) }
     var photoUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var weightHistory by remember { mutableStateOf<List<Pair<kotlinx.datetime.LocalDate, Double>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var uploading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -43,6 +44,7 @@ fun ProgressPhotosScreen(onBack: () -> Unit) {
     suspend fun refresh() {
         photos = fetchProgressPhotos()
         photoUrls = photos.associate { it.id to getPhotoUrl(it.storage_path) }
+        weightHistory = fetchWeightHistory()
         loading = false
     }
 
@@ -76,12 +78,20 @@ fun ProgressPhotosScreen(onBack: () -> Unit) {
                     modifier = Modifier.size(22.dp).clickable { previewPhoto = null }
                 )
                 Spacer(Modifier.width(14.dp))
-                Text(
-                    formatDayMonth(preview.date),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        formatDayMonth(preview.date),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    weightNearDate(weightHistory, preview.date)?.let {
+                        Text(
+                            "${it.oneDecimal()} kg",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppColors.TextTertiary
+                        )
+                    }
+                }
                 Icon(
                     Icons.Outlined.Delete,
                     contentDescription = "Delete photo",
@@ -302,8 +312,10 @@ fun ProgressPhotosScreen(onBack: () -> Unit) {
                                 }
                             }
                             Spacer(Modifier.height(5.dp))
+                            val nearbyWeight = weightNearDate(weightHistory, photo.date)
                             Text(
-                                formatDayMonth(photo.date),
+                                if (nearbyWeight != null) "${formatDayMonth(photo.date)} · ${nearbyWeight.oneDecimal()} kg"
+                                else formatDayMonth(photo.date),
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
@@ -312,4 +324,14 @@ fun ProgressPhotosScreen(onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Most recent weight logged on or before the given date — matches how someone
+ * would naturally think of "what did I weigh around this photo," since weigh-ins
+ * and photos are rarely on the exact same day.
+ */
+private fun weightNearDate(history: List<Pair<kotlinx.datetime.LocalDate, Double>>, date: String): Double? {
+    val target = runCatching { kotlinx.datetime.LocalDate.parse(date) }.getOrNull() ?: return null
+    return history.lastOrNull { it.first <= target }?.second
 }

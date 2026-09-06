@@ -89,6 +89,9 @@ fun HomeFeedScreen() {
     var showInviteSheet by remember { mutableStateOf(false) }
     var groupPendingDelete by remember { mutableStateOf<GroupRow?>(null) }
 
+    var selectedWorkoutId by remember { mutableStateOf<String?>(null) }
+    var selectedDietLogId by remember { mutableStateOf<String?>(null) }
+
     suspend fun loadGroups() {
         loadingGroups = true
         val fetched = fetchMyGroups()
@@ -147,6 +150,15 @@ fun HomeFeedScreen() {
             HomeTab.FEED -> { loadingFeed = true; refreshFeed(gid) }
             HomeTab.LEADERBOARD -> loadLeaderboard(gid)
         }
+    }
+
+    selectedWorkoutId?.let { id ->
+        WorkoutDetailScreen(workoutId = id, onBack = { selectedWorkoutId = null })
+        return
+    }
+    selectedDietLogId?.let { id ->
+        DietDetailScreen(dietLogId = id, onBack = { selectedDietLogId = null })
+        return
     }
 
     val grouped = remember(items) { groupConsecutive(items) }
@@ -250,6 +262,8 @@ fun HomeFeedScreen() {
                                         items(grouped, key = { it.userId + it.entries.first().id }) { group ->
                                             FeedGroupCard(
                                                 group = group,
+                                                onOpenWorkout = { selectedWorkoutId = it },
+                                                onOpenDiet = { selectedDietLogId = it },
                                                 modifier = Modifier.animateItem(
                                                     fadeInSpec = tween(durationMillis = 400),
                                                     placementSpec = tween(durationMillis = 400),
@@ -798,7 +812,12 @@ private fun SheetPrimaryButton(label: String, enabled: Boolean, onClick: () -> U
 }
 
 @Composable
-private fun FeedGroupCard(group: FeedGroup, modifier: Modifier = Modifier) {
+private fun FeedGroupCard(
+    group: FeedGroup,
+    onOpenWorkout: (String) -> Unit,
+    onOpenDiet: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier.fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -825,7 +844,13 @@ private fun FeedGroupCard(group: FeedGroup, modifier: Modifier = Modifier) {
         }
 
         group.entries.forEachIndexed { index, item ->
-            FeedEntryRow(item)
+            FeedEntryRow(item) {
+                val refId = item.reference_id ?: return@FeedEntryRow
+                when (item.activity_type) {
+                    "workout" -> onOpenWorkout(refId)
+                    "diet" -> onOpenDiet(refId)
+                }
+            }
             if (index < group.entries.lastIndex) {
                 Spacer(Modifier.height(2.dp))
                 HorizontalDivider(color = AppColors.Divider)
@@ -836,10 +861,12 @@ private fun FeedGroupCard(group: FeedGroup, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun FeedEntryRow(item: FeedItem) {
+private fun FeedEntryRow(item: FeedItem, onClick: () -> Unit) {
     val isWorkout = item.activity_type == "workout"
-
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
             modifier = Modifier.size(30.dp).clip(CircleShape).background(Color(0xFF3A2A26)),
             contentAlignment = Alignment.Center
