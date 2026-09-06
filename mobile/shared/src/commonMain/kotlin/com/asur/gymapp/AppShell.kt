@@ -34,11 +34,12 @@ fun AppShell() {
     var logSection by remember { mutableStateOf(LogSection.WORKOUT) }
     var logNested by remember { mutableStateOf(false) }
     var profileNested by remember { mutableStateOf(false) }
+    var homeNested by remember { mutableStateOf(false) }
 
     val navVisible = when (currentTab) {
+        Tab.HOME -> !homeNested
         Tab.LOG -> !logNested
         Tab.PROFILE -> !profileNested
-        else -> true
     }
 
     Box(
@@ -48,7 +49,7 @@ fun AppShell() {
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         when (currentTab) {
-            Tab.HOME -> HomeFeedScreen()
+            Tab.HOME -> HomeFeedScreen(onNestedChange = { homeNested = it })
             Tab.LOG -> {
                 Column {
                     if (!logNested) {

@@ -216,3 +216,31 @@ suspend fun fetchGroupStatus(): List<Pair<UserProfileRow, Boolean>> {
 
     return users.map { it to (it.id in activeIds) }
 }
+
+suspend fun updateFeedVisibleWorkouts(visible: Boolean) {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return
+    supabase.postgrest.from("users").update(
+        buildJsonObject { put("feed_visible_workouts", visible) }
+    ) { filter { eq("id", userId) } }
+}
+
+suspend fun updateFeedVisibleDiet(visible: Boolean) {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return
+    supabase.postgrest.from("users").update(
+        buildJsonObject { put("feed_visible_diet", visible) }
+    ) { filter { eq("id", userId) } }
+}
+
+suspend fun updateShowInStatusRow(visible: Boolean) {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return
+    supabase.postgrest.from("users").update(
+        buildJsonObject { put("show_in_status_row", visible) }
+    ) { filter { eq("id", userId) } }
+}
+
+suspend fun updateShowOnLeaderboard(visible: Boolean) {
+    val userId = supabase.auth.currentUserOrNull()?.id ?: return
+    supabase.postgrest.from("users").update(
+        buildJsonObject { put("show_on_leaderboard", visible) }
+    ) { filter { eq("id", userId) } }
+}

@@ -260,32 +260,49 @@ fun ProfileScreen(onNestedChange: (Boolean) -> Unit = {}) {
                     }
                 }
                 Spacer(Modifier.height(20.dp))
+                Text("PRIVACY", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
+                Spacer(Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Show my activity", style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                "Visible in the group feed",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        Spacer(Modifier.width(14.dp))
-                        Switch(
-                            checked = p?.feed_visible ?: true,
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        PrivacyToggleRow(
+                            title = "Workouts",
+                            subtitle = "Visible in your groups' feed",
+                            checked = p?.feed_visible_workouts ?: true,
                             onCheckedChange = { visible ->
-                                scope.launch {
-                                    updateFeedVisibility(visible)
-                                    loadAll()
-                                }
+                                scope.launch { updateFeedVisibleWorkouts(visible); loadAll() }
                             }
+                        )
+                        HorizontalDivider(color = AppColors.Divider)
+                        PrivacyToggleRow(
+                            title = "Diet",
+                            subtitle = "Visible in your groups' feed",
+                            checked = p?.feed_visible_diet ?: true,
+                            onCheckedChange = { visible ->
+                                scope.launch { updateFeedVisibleDiet(visible); loadAll() }
+                            }
+                        )
+                        HorizontalDivider(color = AppColors.Divider)
+                        PrivacyToggleRow(
+                            title = "\"Who's active today\"",
+                            subtitle = "Show me in the status row on Home",
+                            checked = p?.show_in_status_row ?: true,
+                            onCheckedChange = { visible ->
+                                scope.launch { updateShowInStatusRow(visible); loadAll() }
+                            }
+                        )
+                        HorizontalDivider(color = AppColors.Divider)
+                        PrivacyToggleRow(
+                            title = "Leaderboard",
+                            subtitle = "Appear in group rankings",
+                            checked = p?.show_on_leaderboard ?: true,
+                            onCheckedChange = { visible ->
+                                scope.launch { updateShowOnLeaderboard(visible); loadAll() }
+                            },
+                            showDivider = false
                         )
                     }
                 }
@@ -819,5 +836,27 @@ private fun LogWeightSheet(currentWeightKg: Double?, onDismiss: () -> Unit, onSa
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PrivacyToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    showDivider: Boolean = true
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(2.dp))
+            Text(subtitle, style = MaterialTheme.typography.labelSmall)
+        }
+        Spacer(Modifier.width(14.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

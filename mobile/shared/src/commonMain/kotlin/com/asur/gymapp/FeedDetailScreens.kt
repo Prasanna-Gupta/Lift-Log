@@ -86,7 +86,7 @@ fun WorkoutDetailScreen(workoutId: String, onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            contentPadding = PaddingValues(bottom = 120.dp)
         ) {
             items(grouped.entries.toList(), key = { it.key }) { (_, exerciseSets) ->
                 val exerciseName = exerciseSets.firstOrNull()?.exercises?.name ?: "Exercise"

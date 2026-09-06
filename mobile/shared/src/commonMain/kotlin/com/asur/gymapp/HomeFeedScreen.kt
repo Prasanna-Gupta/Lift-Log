@@ -68,7 +68,7 @@ private enum class GroupSheetStep { MENU, CREATE, JOIN, CREATED }
 
 @OptIn(ExperimentalTime::class, ExperimentalMaterial3Api::class)
 @Composable
-fun HomeFeedScreen() {
+fun HomeFeedScreen(onNestedChange: (Boolean) -> Unit = {}) {
     val scope = rememberCoroutineScope()
 
     var groups by remember { mutableStateOf<List<GroupRow>>(emptyList()) }
@@ -91,6 +91,10 @@ fun HomeFeedScreen() {
 
     var selectedWorkoutId by remember { mutableStateOf<String?>(null) }
     var selectedDietLogId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(selectedWorkoutId, selectedDietLogId) {
+        onNestedChange(selectedWorkoutId != null || selectedDietLogId != null)
+    }
 
     suspend fun loadGroups() {
         loadingGroups = true

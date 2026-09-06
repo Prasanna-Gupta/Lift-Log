@@ -68,7 +68,7 @@ suspend fun fetchGroupStatus(groupId: String): List<Pair<UserProfileRow, Boolean
         .select {
             filter {
                 isIn("id", memberIds)
-                eq("feed_visible", true)
+                eq("show_in_status_row", true)
             }
         }
         .decodeList<UserProfileRow>()

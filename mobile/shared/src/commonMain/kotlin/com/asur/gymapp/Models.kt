@@ -120,6 +120,10 @@ data class UserProfileRow(
     val nudge_cutoff_time: String? = null,
     val nudge_enabled: Boolean? = null,
     val feed_visible: Boolean? = null,
+    val feed_visible_workouts: Boolean? = true,
+    val feed_visible_diet: Boolean? = true,
+    val show_in_status_row: Boolean? = true,
+    val show_on_leaderboard: Boolean? = true,
     val created_at: String? = null,
     val onboarding_completed: Boolean = false
 )

@@ -237,10 +237,16 @@ async function checkFriendActivity() {
   if (!unnotified || unnotified.length === 0) return;
 
   for (const item of unnotified) {
-    const { data: actorRows } = await supabase.from('users').select('id, name, feed_visible').eq('id', item.user_id).limit(1);
+    const { data: actorRows } = await supabase.from('users').select('id, name, feed_visible_workouts, feed_visible_diet').eq('id', item.user_id).limit(1);
     const actor = actorRows?.[0];
 
-    if (!actor || actor.feed_visible === false) {
+    const visibleForThisType = item.activity_type === 'workout'
+      ? actor?.feed_visible_workouts !== false
+      : item.activity_type === 'diet'
+        ? actor?.feed_visible_diet !== false
+        : true;
+
+    if (!actor || !visibleForThisType) {
       await supabase.from('activity_feed').update({ friends_notified: true }).eq('id', item.id);
       continue;
     }
