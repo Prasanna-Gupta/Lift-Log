@@ -203,6 +203,7 @@ data class ProgressPhotoInsert(val user_id: String, val storage_path: String, va
 @Serializable
 data class ProgressPhotoRow(val id: String, val storage_path: String, val date: String)
 
+@Serializable
 data class TemplateCountRow(
     val template_id: String,
     val exercise_count: Long
