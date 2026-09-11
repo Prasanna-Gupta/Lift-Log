@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.jan.supabase.auth.auth
@@ -211,13 +212,22 @@ fun DietLogScreen(onNestedChange: (Boolean) -> Unit = {}) {
                     contentPadding = PaddingValues(bottom = 120.dp)
                 ) {
                     itemsIndexed(entries, key = { _, e -> e.id }) { index, entry ->
+                        var expanded by remember { mutableStateOf(false) }
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 13.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(entry.meal_label ?: "Entry", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Column(
+                                modifier = Modifier.weight(1f).clickable { expanded = !expanded }
+                            ) {
+                                Text(
+                                    entry.meal_label ?: "Entry",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     buildString {
@@ -229,6 +239,7 @@ fun DietLogScreen(onNestedChange: (Boolean) -> Unit = {}) {
                                     color = AppColors.TextTertiary
                                 )
                             }
+                            Spacer(Modifier.width(10.dp))
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = "Delete entry",

@@ -30,6 +30,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import io.github.jan.supabase.auth.providers.invoke
 import kotlinx.coroutines.launch
 
 @Composable
@@ -59,6 +61,25 @@ fun FoodSearchScreen(
             } finally {
                 searching = false
             }
+        }
+    }
+
+    LaunchedEffect(query) {
+        if (query.isBlank()) {
+            results = emptyList()
+            hasSearched = false
+            return@LaunchedEffect
+        }
+        delay(300)
+        searching = true
+        errorMessage = null
+        try {
+            results = searchFood(query)
+            hasSearched = true
+        } catch (e: Exception) {
+            errorMessage = "Search failed. ${e.message}"
+        } finally {
+            searching = false
         }
     }
 
@@ -201,10 +222,6 @@ private fun PortionPickerScreen(
     onConfirm: (calories: Int, proteinG: Double, fatG: Double, fiberG: Double, label: String) -> Unit,
     onBack: () -> Unit
 ) {
-    var selectedPortion by remember { mutableStateOf(food.portions.firstOrNull()) }
-    var quantityText by remember { mutableStateOf("1") }
-    val quantity = quantityText.toDoubleOrNull()
-
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 20.dp),
@@ -226,93 +243,175 @@ private fun PortionPickerScreen(
         }
 
         if (food.portions.isEmpty()) {
-            Text(
-                "No portion data available for this food.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 20.dp)
-            )
-            return
+            GramsEntryPicker(food = food, onConfirm = onConfirm)
+        } else {
+            PortionListPicker(food = food, onConfirm = onConfirm)
         }
+    }
+}
 
-        Text("PORTION", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp))
+@Composable
+private fun ColumnScope.PortionListPicker(
+    food: FoodDetail,
+    onConfirm: (calories: Int, proteinG: Double, fatG: Double, fiberG: Double, label: String) -> Unit
+) {
+    var selectedPortion by remember { mutableStateOf(food.portions.firstOrNull()) }
+    var quantityText by remember { mutableStateOf("1") }
+    val quantity = quantityText.toDoubleOrNull()
 
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(food.portions) { portion ->
-                val selected = portion == selectedPortion
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (selected) Color(0xFF3A2A26) else MaterialTheme.colorScheme.surface)
-                        .clickable { selectedPortion = portion }
-                        .padding(horizontal = 16.dp, vertical = 13.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(portion.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        Text("${portion.grams.toInt()}g", style = MaterialTheme.typography.bodySmall, color = AppColors.TextTertiary)
-                    }
-                    if (selected) {
-                        Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                    }
+    Text("PORTION", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp))
+
+    LazyColumn(modifier = Modifier.weight(1f)) {
+        items(food.portions) { portion ->
+            val selected = portion == selectedPortion
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (selected) Color(0xFF3A2A26) else MaterialTheme.colorScheme.surface)
+                    .clickable { selectedPortion = portion }
+                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(portion.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Text("${portion.grams.toInt()}g", style = MaterialTheme.typography.bodySmall, color = AppColors.TextTertiary)
+                }
+                if (selected) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Quantity", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            BasicTextField(
-                value = quantityText,
-                onValueChange = { raw -> quantityText = raw.filter { it.isDigit() || it == '.' }.take(5) },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.width(60.dp)
-            )
-        }
-        if (quantity == null || quantity <= 0) {
-            Spacer(Modifier.height(6.dp))
-            Text("Enter a quantity greater than 0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (selectedPortion != null && quantity != null && quantity > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(enabled = selectedPortion != null && quantity != null && quantity > 0) {
-                    val portion = selectedPortion ?: return@clickable
-                    val qty = quantity ?: return@clickable
-                    val totalGrams = portion.grams * qty
-                    val scale = totalGrams / 100.0
-                    val qtyLabel = if (qty == qty.toInt().toDouble()) qty.toInt().toString() else qty.toString()
-                    onConfirm(
-                        ((food.caloriesPer100g ?: 0.0) * scale).toInt(),
-                        (food.proteinPer100g ?: 0.0) * scale,
-                        (food.fatPer100g ?: 0.0) * scale,
-                        (food.fiberPer100g ?: 0.0) * scale,
-                        "${food.description} ($qtyLabel × ${portion.label})"
-                    )
-                }
-                .padding(vertical = 15.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                "Add to log",
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
-                fontWeight = FontWeight.Medium,
-                color = if (selectedPortion != null && quantity != null && quantity > 0) Color(0xFF4A1B0C) else AppColors.TextTertiary
-            )
-        }
-        Spacer(Modifier.height(24.dp))
     }
+
+    Spacer(Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Quantity", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        BasicTextField(
+            value = quantityText,
+            onValueChange = { raw -> quantityText = raw.filter { it.isDigit() || it == '.' }.take(5) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.width(60.dp)
+        )
+    }
+    if (quantity == null || quantity <= 0) {
+        Spacer(Modifier.height(6.dp))
+        Text("Enter a quantity greater than 0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+
+    Spacer(Modifier.height(16.dp))
+    val valid = selectedPortion != null && quantity != null && quantity > 0
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = valid) {
+                val portion = selectedPortion ?: return@clickable
+                val qty = quantity ?: return@clickable
+                val totalGrams = portion.grams * qty
+                val scale = totalGrams / 100.0
+                val qtyLabel = if (qty == qty.toInt().toDouble()) qty.toInt().toString() else qty.toString()
+                onConfirm(
+                    ((food.caloriesPer100g ?: 0.0) * scale).toInt(),
+                    (food.proteinPer100g ?: 0.0) * scale,
+                    (food.fatPer100g ?: 0.0) * scale,
+                    (food.fiberPer100g ?: 0.0) * scale,
+                    "${food.description} ($qtyLabel × ${portion.label})"
+                )
+            }
+            .padding(vertical = 15.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "Add to log",
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+            fontWeight = FontWeight.Medium,
+            color = if (valid) Color(0xFF4A1B0C) else AppColors.TextTertiary
+        )
+    }
+    Spacer(Modifier.height(24.dp))
+}
+
+@Composable
+private fun ColumnScope.GramsEntryPicker(
+    food: FoodDetail,
+    onConfirm: (calories: Int, proteinG: Double, fatG: Double, fiberG: Double, label: String) -> Unit
+) {
+    var gramsText by remember { mutableStateOf("100") }
+    val grams = gramsText.toDoubleOrNull()
+
+    Text(
+        "No preset portions for this food — enter the weight directly.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 20.dp)
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 18.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        BasicTextField(
+            value = gramsText,
+            onValueChange = { raw -> gramsText = raw.filter { it.isDigit() || it == '.' }.take(6) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.headlineMedium.copy(
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.weight(1f).padding(vertical = 14.dp)
+        )
+        Text("g", style = MaterialTheme.typography.bodyMedium, color = AppColors.TextTertiary)
+    }
+
+    if (grams == null || grams <= 0) {
+        Spacer(Modifier.height(6.dp))
+        Text("Enter a weight greater than 0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+
+    Spacer(Modifier.weight(1f))
+
+    val valid = grams != null && grams > 0
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = valid) {
+                val g = grams ?: return@clickable
+                val scale = g / 100.0
+                val gramsLabel = if (g == g.toInt().toDouble()) g.toInt().toString() else g.toString()
+                onConfirm(
+                    ((food.caloriesPer100g ?: 0.0) * scale).toInt(),
+                    (food.proteinPer100g ?: 0.0) * scale,
+                    (food.fatPer100g ?: 0.0) * scale,
+                    (food.fiberPer100g ?: 0.0) * scale,
+                    "${food.description} (${gramsLabel}g)"
+                )
+            }
+            .padding(vertical = 15.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "Add to log",
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+            fontWeight = FontWeight.Medium,
+            color = if (valid) Color(0xFF4A1B0C) else AppColors.TextTertiary
+        )
+    }
+    Spacer(Modifier.height(24.dp))
 }

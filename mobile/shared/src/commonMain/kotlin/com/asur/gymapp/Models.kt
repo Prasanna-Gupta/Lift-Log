@@ -228,3 +228,18 @@ data class ProfileSummaryRow(
     val warning_used: Boolean? = null,
     val workout_count: Long? = null
 )
+
+@Serializable
+data class LocalFoodRow(
+    val fdc_id: Long,
+    val description: String,
+    val data_type: String,
+    val brand_owner: String? = null,
+    val calories_per_100g: Double? = null,
+    val protein_per_100g: Double? = null,
+    val fat_per_100g: Double? = null,
+    val fiber_per_100g: Double? = null
+)
+
+@Serializable
+data class LocalPortionRow(val label: String, val grams: Double)
